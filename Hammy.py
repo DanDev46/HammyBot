@@ -16,7 +16,10 @@ import urllib.parse
 import re
 
 
-TOKEN = 'NDM1NTYwNjA0MTI4NzcyMTA2.DbezdA.b_p5YBDhf8XiuIBje5nXLy8o8PY'
+#Moved token to seperate file for security reasons
+TOKEN='ERROR MISSING TOKEN, THIS SHOULDNT DISPLAY'#in case the token fails, we want a meaningful error
+TOKEN = (open("token.txt","r").readline()).strip()
+
 
 client = discord.Client()
 
