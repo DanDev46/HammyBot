@@ -22,7 +22,10 @@ TOKEN = (open("token.txt","r").readline()).strip()
 
 
 client = discord.Client()
-
+global inChat
+global player
+globals()["inChat"]=None
+globals()["player"]=None
 
 @client.event
 async def on_message(message):
@@ -127,27 +130,54 @@ async def on_message(message):
         searchResults = re.findall(r'href=\"\/watch\?v=(.{11})', searchUrl.read().decode())
         #We want the second video in the array as the first is almost always an ad
         videoUrl="http://www.youtube.com/watch?v="+searchResults[1]
-        try:
-            try:
-                voice_channel = message.author.voice.voice_channel
-                global inChat
-                inChat = await client.join_voice_channel(voice_channel)
-            except:
-                #If the bot is already in the voiche channel, do nothing
-                await client.send_message(message.channel, 'Adding your song to queue')
-            global player
-            player = await inChat.create_ytdl_player(videoUrl)
-            player.start()
-        except:
-            await client.send_message(message.channel, 'An error occured:  Either you are not in a voice channel or submitted invalid terms')
+        if(globals()["inChat"] is None):
+            voice_channel = message.author.voice.voice_channel
+            globals()["inChat"] = await client.join_voice_channel(voice_channel)
+            #If the bot is already in the voice channel, add to queue
+        else:
+            await client.send_message(message.channel, 'Adding your song to queue')
+        if(globals()["player"] is None):
+            globals()["player"] = await inChat.create_ytdl_player(videoUrl)
+            globals()["player"].start()
+        return
 
+    #Easter Eggs
+    elif(message.content.startswith('$steamedhams')):
+        videoUrl="https://www.youtube.com/watch?v=aRsOBFhNjVM"
+        if(globals()["inChat"] is None):
+            voice_channel = message.author.voice.voice_channel
+            globals()["inChat"] = await client.join_voice_channel(voice_channel)
+            #If the bot is already in the voice channel, add to queue
+        else:
+            await client.send_message(message.channel, 'Adding your song to queue')
+        if(globals()["player"] is None):
+            globals()["player"] = await inChat.create_ytdl_player(videoUrl)
+            globals()["player"].start()
+            await client.send_message(message.channel, 'https://i.ytimg.com/vi/ozXMsFZMydw/maxresdefault.jpg')
         return
 
 
     elif(message.content.startswith('$stop')):
-        try:
-            await inChat.disconnect()
-        except:
+        if(globals()["inChat"] is not None):
+            globals()["player"].stop()
+            await globals()["inChat"].disconnect()
+            globals()["player"]=None
+            globals()["inChat"]=None
+        else:
+            await client.send_message(message.channel, 'An error occured:  No song playing')
+        return
+
+    elif(message.content.startswith('$pause')):
+        if(globals()["player"] is not None):
+            player.pause()
+        else:
+            await client.send_message(message.channel, 'An error occured:  No song playing')
+        return
+
+    elif(message.content.startswith('$resume')):
+        if(globals()["player"] is not None):
+            player.resume()
+        else:
             await client.send_message(message.channel, 'An error occured:  No song playing')
         return
 
@@ -192,5 +222,6 @@ async def on_ready():
     print(client.user.id)
     print('------')
     await client.change_presence(game=discord.Game(name='$help'))
+
 
 client.run(TOKEN)
