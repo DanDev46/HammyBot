@@ -15,7 +15,6 @@ import urllib.request
 import urllib.parse
 import re
 
-
 #Moved token to seperate file for security reasons
 TOKEN='ERROR MISSING TOKEN, THIS SHOULDNT DISPLAY'#in case the token fails, we want a meaningful error
 TOKEN = (open("token.txt","r").readline()).strip()
@@ -24,31 +23,21 @@ TOKEN = (open("token.txt","r").readline()).strip()
 client = discord.Client()
 global inChat
 global player
+global q
 globals()["inChat"]=None
 globals()["player"]=None
-
-@client.event
-async def on_message(message):
-
-    if message.author == client.user:
-        return
-
-    if message.content.startswith('$wheezer'):
-        msg = 'https://cdn.discordapp.com/attachments/361994220916965387/435840858332332073/carl.jpeg'.format(message)
-        await client.send_message(message.channel, msg)
-
+globals()["q"]=[]
 
 @client.event
 async def on_message(message):
     # we do not want the bot to reply to itself
-    if message.author == client.user:
-        return
-
+    #if message.author == client.user:
+        #return
     #Test Image Posting
     if message.content.startswith('$wheezer'):
         #Carl Wheezer (jimmy neutron) image
-        msg = 'https://cdn.discordapp.com/attachments/361994220916965387/435840858332332073/carl.jpeg'.format(message)
-        await client.send_message(message.channel, msg)
+        file=os.getcwd()+'/fun/carl.jpeg'
+        await client.send_file(message.channel, file)
         return
 
 
@@ -66,7 +55,7 @@ async def on_message(message):
         msg = 'An error occurred: Unknown Error, contact Zach'
         await client.send_message(message.channel, 'Enter your sentence')
         sentence=await client.wait_for_message(timeout=120,author=message.author, channel=message.channel)
-
+        #Prompt a couple choices depending on the desired input and output languages
         try:
             if (selection.content=='1' or selection.content=='$1'):
                 result=translator.translate(sentence.content)
@@ -102,11 +91,12 @@ async def on_message(message):
             arguments = {"keywords":Keywords,"limit":1,"format":"jpg"}
             response.download(arguments)
 
-            #upload the image to the server
+            #Start in the base directory and go through every image file (should only be one)
             upDir=os.getcwd()+'/downloads/'+Keywords+"/"
             for root, dirs, files in os.walk(upDir):
                 for file in files:
                     if (file.endswith('.jpg') or file.endswith('.jpeg')):
+                        #upload the image to the server
                         await client.send_file(message.channel, upDir+file)
 
 
@@ -134,11 +124,9 @@ async def on_message(message):
             voice_channel = message.author.voice.voice_channel
             globals()["inChat"] = await client.join_voice_channel(voice_channel)
             #If the bot is already in the voice channel, add to queue
-        else:
-            await client.send_message(message.channel, 'Adding your song to queue')
-        if(globals()["player"] is None):
-            globals()["player"] = await inChat.create_ytdl_player(videoUrl)
-            globals()["player"].start()
+        globals()["q"].append(videoUrl)
+        await client.send_message(message.channel, 'Adding your song to queue...')
+        await playQueue(message)
         return
 
     #Easter Eggs
@@ -148,12 +136,10 @@ async def on_message(message):
             voice_channel = message.author.voice.voice_channel
             globals()["inChat"] = await client.join_voice_channel(voice_channel)
             #If the bot is already in the voice channel, add to queue
-        else:
-            await client.send_message(message.channel, 'Adding your song to queue')
-        if(globals()["player"] is None):
-            globals()["player"] = await inChat.create_ytdl_player(videoUrl)
-            globals()["player"].start()
-            await client.send_message(message.channel, 'https://i.ytimg.com/vi/ozXMsFZMydw/maxresdefault.jpg')
+        await client.send_message(message.channel, 'Adding your song to queue...')
+        globals()["q"].append(videoUrl)
+        await playQueue(message)
+        await client.send_message(message.channel, 'https://i.ytimg.com/vi/ozXMsFZMydw/maxresdefault.jpg')
         return
 
 
@@ -163,6 +149,8 @@ async def on_message(message):
             await globals()["inChat"].disconnect()
             globals()["player"]=None
             globals()["inChat"]=None
+            await client.send_message(message.channel, 'Stopping Music...')
+            globals()["q"].clear()
         else:
             await client.send_message(message.channel, 'An error occured:  No song playing')
         return
@@ -170,6 +158,7 @@ async def on_message(message):
     elif(message.content.startswith('$pause')):
         if(globals()["player"] is not None):
             player.pause()
+            await client.send_message(message.channel, 'Pausing Song...')
         else:
             await client.send_message(message.channel, 'An error occured:  No song playing')
         return
@@ -177,8 +166,15 @@ async def on_message(message):
     elif(message.content.startswith('$resume')):
         if(globals()["player"] is not None):
             player.resume()
+            await client.send_message(message.channel, 'Resuming Music...')
         else:
             await client.send_message(message.channel, 'An error occured:  No song playing')
+        return
+
+    elif(message.content.startswith('$skip')):
+        globals()["player"].stop()
+        await client.send_message(message.channel, 'Skipping Song...')
+        await playQueue(message)
         return
 
 
@@ -203,8 +199,10 @@ async def on_message(message):
                 await client.send_message(message.channel, 'Pulls an image from Google Images')
                 await client.send_message(message.channel, 'Usage:  $image [search terms]')
             elif(subCommand[1]=='play'):
-                await client.send_message(message.channel, 'Plays a song from youtube')
-                await client.send_message(message.channel, '\nUsage:  $play [search terms]\n$stop to end playlist\n$pause to pause playlist\n$skip to go to next song')
+                await client.send_message(message.channel, 'Plays a song from youtube using given terms or url')
+                await client.send_message(message.channel, '\nUsage:  $play [search terms]\n$stop to end playlist\n$pause to pause playlist\n$resume to resume song after pause\n$skip to go to next song')
+            elif(subCommand[1]=='steamedhams'):
+                await client.send_message(message.channel, 'Patented skinner burgers')
             else:
                 await client.send_message(message.channel, subCommand[1])
                 return
@@ -212,6 +210,23 @@ async def on_message(message):
             await client.send_message(message.channel, 'An error occurred: too many arguments \nType $help to view a list of all commands or \nType $help [command] to get info on the specific command')
             return
 
+
+@client.event
+async def playQueue(message):
+    if(len(globals()["q"]) > 0):
+        if(globals()["player"] is not None):
+            while(not (globals()["player"].is_done())):
+                x=1
+            if(globals()["player"].is_done()):
+                globals()["player"].stop()
+                globals()["player"]=None
+        url=globals()["q"].pop(0)
+        globals()["player"] = await globals()["inChat"].create_ytdl_player(url)
+        globals()["player"].start()
+        await client.send_message(message.channel, 'Now Playing:  '+url)
+        if(len(globals()["q"]) > 0):
+            await playQueue(message)
+        return
 
 
 
